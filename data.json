@@ -1,0 +1,20 @@
+{
+  "1": {
+    "github.com": "available",
+    "google.com": "available",
+    "links_num": 1,
+    "vk.com": "available"
+  },
+  "2": {
+    "github.com": "available",
+    "google.com": "available",
+    "links_num": 2,
+    "vk.com": "available"
+  },
+  "3": {
+    "github.com": "available",
+    "google.com": "available",
+    "links_num": 3,
+    "vk.com": "available"
+  }
+}
