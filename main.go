@@ -30,8 +30,15 @@ func main() {
 	api.Mount("/v1", v1)
 	r.Mount("/api", api)
 
+	server := &http.Server{
+		Addr:         ":8080",
+		ReadTimeout:  0,
+		WriteTimeout: 0,
+		IdleTimeout:  0,
+		Handler:      r,
+	}
 	// addr := fmt.Sprintf("%v:%v", "localhost", "8080")
-	err := http.ListenAndServe(":8080", r)
+	err := server.ListenAndServe()
 	if err != nil {
 		log.Fatal(err)
 	}

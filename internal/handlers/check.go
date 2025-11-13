@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/deside01/is_available/internal/config"
 	"github.com/deside01/is_available/internal/utils"
 )
 
@@ -17,14 +18,13 @@ type ReqBody struct {
 	Links []string `json:"links"`
 }
 
-var mu = sync.Mutex{}
-
 func Check(w http.ResponseWriter, r *http.Request) {
 	var body ReqBody
 	json.NewDecoder(r.Body).Decode(&body)
 
 	wg := &sync.WaitGroup{}
-	queue := make(chan struct{}, 3)
+	queue := make(chan struct{}, config.Data.QueueLimit)
+
 	dataMap := make(map[string]map[string]any)
 	newData := make(map[string]any)
 
@@ -38,8 +38,13 @@ func Check(w http.ResponseWriter, r *http.Request) {
 				wg.Done()
 			}()
 
-			stat, _ := getStatus(link, newData)
-			log.Println(stat + link)
+			err := getStatus(link, newData)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+			log.Printf("%v: OK", link)
 		}(link)
 	}
 	wg.Wait()
@@ -75,30 +80,36 @@ func Check(w http.ResponseWriter, r *http.Request) {
 	utils.ResJSON(w, 201, newData)
 }
 
-func getStatus(link string, newData map[string]any) (string, error) {
+func getStatus(link string, newData map[string]any) error {
 	safeLink := link
 	if !hasProtocol(link) {
 		safeLink = fmt.Sprintf("https://%v", link)
 	}
 
-	resp, err := http.Get(safeLink)
+	req, err := http.NewRequest(http.MethodGet, safeLink, nil)
 	if err != nil {
-		log.Printf("Не удалось сделать запрос: %v", err)
-		return "not available", err
+		return fmt.Errorf("не удалось создать запрос: %w", err)
+	}
+	req.Header = config.Data.Headers
+
+	config.Data.Mu.Lock()
+	defer config.Data.Mu.Unlock()
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		newData[link] = "not available"
+		return fmt.Errorf("не удалось сделать запрос: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		log.Println(resp.Status)
-		return "not available", nil
+		newData[link] = "not available"
+		return nil
 	}
-
-	mu.Lock()
-	defer mu.Unlock()
 
 	newData[link] = "available"
 
-	return "available", nil
+	return nil
 }
 
 func hasProtocol(link string) bool {
