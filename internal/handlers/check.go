@@ -49,6 +49,8 @@ func Check(w http.ResponseWriter, r *http.Request) {
 	}
 	wg.Wait()
 
+	config.Data.Mu.Lock()
+
 	file, err := os.OpenFile("data.json", os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		log.Printf("openFile: %v", err)
@@ -77,6 +79,8 @@ func Check(w http.ResponseWriter, r *http.Request) {
 
 	encoder.Encode(dataMap)
 
+	config.Data.Mu.Unlock()
+
 	utils.ResJSON(w, 201, newData)
 }
 
@@ -91,9 +95,6 @@ func getStatus(link string, newData map[string]any) error {
 		return fmt.Errorf("не удалось создать запрос: %w", err)
 	}
 	req.Header = config.Data.Headers
-
-	config.Data.Mu.Lock()
-	defer config.Data.Mu.Unlock()
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

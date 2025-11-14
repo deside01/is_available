@@ -26,6 +26,7 @@ func main() {
 	api := chi.NewRouter()
 	v1 := chi.NewRouter()
 	v1.Get("/check", handlers.Check)
+	v1.Get("/data", handlers.GetData)
 
 	api.Mount("/v1", v1)
 	r.Mount("/api", api)
