@@ -18,7 +18,7 @@ import (
 func Check(w http.ResponseWriter, r *http.Request) {
 	links, err := parseBody(r)
 	if err != nil {
-		utils.ResERR(w, 400, err.Error())
+		utils.ResERR(w, 404, err.Error())
 		return
 	}
 
