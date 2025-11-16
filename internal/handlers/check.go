@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"maps"
 	"net/http"
 	"os"
 	"strconv"
@@ -14,13 +15,12 @@ import (
 	"github.com/deside01/is_available/internal/utils"
 )
 
-type ReqBody struct {
-	Links []string `json:"links"`
-}
-
 func Check(w http.ResponseWriter, r *http.Request) {
-	var body ReqBody
-	json.NewDecoder(r.Body).Decode(&body)
+	links, err := parseBody(r)
+	if err != nil {
+		utils.ResERR(w, 400, err.Error())
+		return
+	}
 
 	wg := &sync.WaitGroup{}
 	queue := make(chan struct{}, config.Data.QueueLimit)
@@ -28,7 +28,7 @@ func Check(w http.ResponseWriter, r *http.Request) {
 	dataMap := make(map[string]map[string]any)
 	newData := make(map[string]any)
 
-	for _, link := range body.Links {
+	for _, link := range links {
 		wg.Add(1)
 		queue <- struct{}{}
 
@@ -38,11 +38,17 @@ func Check(w http.ResponseWriter, r *http.Request) {
 				wg.Done()
 			}()
 
-			err := getStatus(link, newData)
+			tempData := make(map[string]any)
+
+			err := getStatus(link, tempData)
 			if err != nil {
 				log.Println(err)
 				return
 			}
+
+			config.Data.Mu.Lock()
+			maps.Copy(newData, tempData)
+			config.Data.Mu.Unlock()
 
 			log.Printf("%v: OK", link)
 		}(link)
@@ -72,14 +78,14 @@ func Check(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	newData["links_num"] = oldDataLength
-
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
 
 	encoder.Encode(dataMap)
 
 	config.Data.Mu.Unlock()
+
+	newData["links_num"] = oldDataLength
 
 	utils.ResJSON(w, 201, newData)
 }

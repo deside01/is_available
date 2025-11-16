@@ -1,17 +1,21 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
+	"github.com/deside01/is_available/internal/config"
 	"github.com/deside01/is_available/internal/handlers"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	godotenv.Load()
 	r := chi.NewRouter()
 
 	r.Use(cors.Handler(cors.Options{
@@ -32,15 +36,30 @@ func main() {
 	r.Mount("/api", api)
 
 	server := &http.Server{
-		Addr:         ":8080",
+		Addr:         config.Data.Address,
 		ReadTimeout:  0,
 		WriteTimeout: 0,
 		IdleTimeout:  0,
 		Handler:      r,
 	}
-	// addr := fmt.Sprintf("%v:%v", "localhost", "8080")
-	err := server.ListenAndServe()
-	if err != nil {
-		log.Fatal(err)
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		log.Printf("Server running: %v", config.Data.Address)
+		err := server.ListenAndServe()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
+	<-stop
+
+	log.Println("Получен сигнал остановки сервера")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Printf("Shutdown error: %v", err)
 	}
 }

@@ -14,6 +14,12 @@ import (
 )
 
 func GetData(w http.ResponseWriter, r *http.Request) {
+	links_list, err := parseIntBody(r)
+	if err != nil {
+		utils.ResERR(w, 404, err.Error())
+		return
+	}
+
 	file, err := os.Open("data.json")
 	if err != nil {
 		log.Printf("open file: %v", err)
@@ -27,12 +33,13 @@ func GetData(w http.ResponseWriter, r *http.Request) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
 
-	for _, dataMap := range data {
-		for link, status := range dataMap {
-			if link == "links_num" {
-				continue
-			}
+	for _, num := range links_list {
+		listMap, ok := data[strconv.Itoa(num)]
+		if !ok {
+			continue
+		}
 
+		for link, status := range listMap {
 			if pdf.GetY() > 255 {
 				pdf.AddPage()
 			}
